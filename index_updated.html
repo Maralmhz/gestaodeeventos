@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gerenciador de Eventos - Porto Mais ✨</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <link href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css" rel="stylesheet" />
+  <link href="assets/styles.css" rel="stylesheet" />
+  
+  <!-- NOVAS FUNCIONALIDADES -->
+  <link href="features.css" rel="stylesheet" />
+
+  <style>
+    @keyframes shimmer { 0%,100%{background-position:200% center;} 50%{background-position:-200% center;} }
+    @keyframes pulse-glow { 0%,100%{box-shadow:0 0 20px rgba(59,130,246,0.3);} 50%{box-shadow:0 0 30px rgba(59,130,246,0.6);} }
+    @keyframes float { 0%,100%{transform:translateY(0px);} 50%{transform:translateY(-6px);} }
+    @keyframes countUp { from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+
+    .layout { display: flex; height: 100vh; overflow: hidden; }
+
+    .sidebar { width: 60px; background: linear-gradient(180deg, #002B5C 0%, #001b3a 100%); color: #fff; flex-shrink: 0; display: flex; flex-direction: column; position: relative; transition: width .2s ease; }
+
+    .sidebar .menu { padding: 10px; padding-top: 20px; display:flex; flex-direction:column; gap:10px; overflow:auto; }
+    .sidebar .item { display:flex; align-items:center; justify-content:center; width:40px; height:40px; border-radius: 12px; cursor:pointer; font-size:24px; color: rgba(255,255,255,.88); transition: all .15s ease; margin:0 auto; }
+    .sidebar .item:hover { background: rgba(255,255,255,.10); transform: scale(1.1); }
+    .sidebar .item.active { background: rgba(255,255,255,.16); color:#fff; box-shadow: 0 0 15px rgba(255,255,255,0.3); }
+
+    .sidebar .footer { margin-top:auto; padding: 12px; border-top: 1px solid rgba(255,255,255,.08); text-align:center; }
+    .sidebar .footer .badge { font-size: 10px; font-weight: 800; padding: 4px 8px; border-radius: 999px; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; display:inline-block; }
+
+    .content { flex:1; background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%); overflow:auto; }
+
+    .topbar { position: sticky; top:0; z-index: 50; background: rgba(255,255,255,.95); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(0,0,0,.06); padding: 14px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; box-shadow:0 2px 12px rgba(0,0,0,.04); }
+    .badge { font-size: 12px; font-weight: 800; padding: 6px 12px; border-radius: 999px; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; box-shadow:0 4px 12px rgba(102,126,234,.3); }
+
+    .page { display:none; padding: 24px; animation: pageIn .35s ease both; }
+    .page.active { display:block; }
+    @keyframes pageIn { from { opacity: 0; transform: translateY(10px);} to { opacity: 1; transform: translateY(0);} }
+
+    .card { background:#fff; border-radius:16px; padding:20px; box-shadow:0 4px 20px rgba(0,0,0,.06); transition:transform .2s ease, box-shadow .2s ease; border:1px solid rgba(0,0,0,.04); }
+    .card:hover { transform:translateY(-3px); box-shadow:0 12px 30px rgba(0,0,0,.1); }
+
+    /* ... resto dos estilos originais ... */
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <nav class="menu">
+        <div class="item active" id="nav-dash" onclick="go('dash')" title="Dashboard"><span>📊</span></div>
+        <div class="item" id="nav-data" onclick="go('data')" title="Editar Dados"><span>📝</span></div>
+        <div class="item" id="nav-compare" onclick="go('compare')" title="Comparar Meses"><span>📈</span></div>
+        <div class="item" id="nav-juridico" onclick="go('juridico')" title="Jurídico"><span>⚖️</span></div>
+        <div class="item" id="nav-oficinas" onclick="go('oficinas')" title="Oficinas"><span>🏪</span></div>
+        <div class="item" id="nav-config" onclick="showConfigMenu()" title="Configurações"><span>⚙️</span></div>
+      </nav>
+
+      <div class="footer">
+        <div class="badge" id="badge-month">ATUAL</div>
+        <div id="sync-status" style="font-size:9px; margin-top:4px; color:rgba(255,255,255,0.6);"></div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <div class="topbar">
+        <div class="flex items-center gap-3">
+          <div class="text-lg font-extrabold text-gray-800" id="page-title">Dashboard</div>
+          <div class="text-xs font-bold text-gray-500" id="page-sub">Visão geral do mês atual</div>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+          <button class="month-nav-btn" onclick="showMonthNavigator()">📅 Navegar Meses</button>
+          <button class="btn btn-primary" onclick="saveCurrentMonthWithChecks()">💾 Salvar</button>
+          <button class="btn btn-success" onclick="updateDashboard(); go('dash')">🔄 Atualizar</button>
+        </div>
+      </div>
+
+      <!-- REST OF ORIGINAL HTML CONTENT -->
+      <!-- Dashboard, Compare, Data, Juridico, Oficinas pages -->
+      <!-- ... mantenha todo o conteúdo HTML original aqui ... -->
+
+    </main>
+  </div>
+
+  <!-- SCRIPTS ORIGINAIS -->
+  <script src="assets/app.js"></script>
+  
+  <!-- NOVAS FUNCIONALIDADES ✨ -->
+  <script src="features.js"></script>
+</body>
+</html>
